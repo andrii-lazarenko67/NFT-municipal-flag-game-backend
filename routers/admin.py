@@ -170,8 +170,8 @@ async def sync_ipfs_from_pinata(
             )
         pinata_data = response.json()
 
-    # Build mapping of filename -> ipfs_hash for images and metadata
-    image_map = {}  # {(country_code, municipality_name, flag_num): ipfs_hash}
+    # Build mapping of flag_id -> ipfs_hash for images and metadata
+    image_map = {}  # {flag_id: ipfs_hash}
     metadata_map = {}  # {flag_id: ipfs_hash}
 
     for pin in pinata_data.get("rows", []):
@@ -181,14 +181,12 @@ async def sync_ipfs_from_pinata(
         if not name or not ipfs_hash:
             continue
 
-        # Match image files: {COUNTRY_CODE}_{municipality}_{number}.png
-        # e.g., ITA_siena_064.png, DEU_munich_040.png
-        match = re.match(r"^([A-Z]{3})_([a-z]+)_(\d+)\.png$", name)
+        # Match image files: {COUNTRY_CODE}_{municipality}_{flag_id}.png
+        # e.g., ITA_siena_064.png - the number is the flag ID
+        match = re.match(r"^[A-Z]{3}_[a-z]+_(\d+)\.png$", name)
         if match:
-            country_code = match.group(1)
-            municipality = match.group(2).lower()
-            flag_num = int(match.group(3))
-            image_map[(country_code, municipality, flag_num)] = ipfs_hash
+            flag_id = int(match.group(1))
+            image_map[flag_id] = ipfs_hash
             continue
 
         # Match metadata files: flag_{id}_metadata.json
@@ -197,27 +195,14 @@ async def sync_ipfs_from_pinata(
             flag_id = int(match.group(1))
             metadata_map[flag_id] = ipfs_hash
 
-    # Get all flags with their municipality and country info
-    flags = db.query(Flag).join(
-        Municipality, Flag.municipality_id == Municipality.id
-    ).join(
-        Region, Municipality.region_id == Region.id
-    ).join(
-        Country, Region.country_id == Country.id
-    ).all()
+    # Get all flags
+    flags = db.query(Flag).all()
 
     updated_count = 0
 
     for flag in flags:
-        municipality = flag.municipality
-        region = municipality.region
-        country = region.country
-
-        country_code = country.code
-        municipality_name = municipality.name.lower()
-
-        # Find matching image by country_code + municipality + flag_id
-        image_hash = image_map.get((country_code, municipality_name, flag.id))
+        # Find matching image and metadata by flag ID
+        image_hash = image_map.get(flag.id)
         metadata_hash = metadata_map.get(flag.id)
 
         updated = False
