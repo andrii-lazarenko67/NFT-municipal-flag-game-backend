@@ -1,6 +1,8 @@
 """
 Admin API Router.
 """
+import re
+import httpx
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
@@ -136,3 +138,102 @@ def ipfs_status(
         "flags_with_metadata_hash": flags_with_metadata,
         "flags_pending_upload": total_flags - flags_with_image
     }
+
+
+@router.post("/sync-ipfs-from-pinata", response_model=MessageResponse)
+async def sync_ipfs_from_pinata(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_admin)
+):
+    """
+    Sync IPFS hashes from Pinata to database flags.
+    Matches files by pattern: {COUNTRY_CODE}_{municipality}_{flag_number}.png
+    """
+    if not settings.pinata_jwt:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pinata JWT not configured"
+        )
+
+    # Fetch all pinned files from Pinata
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.pinata.cloud/data/pinList",
+            params={"status": "pinned", "pageLimit": 1000},
+            headers={"Authorization": f"Bearer {settings.pinata_jwt}"},
+            timeout=30.0
+        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to fetch from Pinata: {response.text}"
+            )
+        pinata_data = response.json()
+
+    # Build mapping of filename -> ipfs_hash for images and metadata
+    image_map = {}  # {(country_code, municipality_name, flag_num): ipfs_hash}
+    metadata_map = {}  # {flag_id: ipfs_hash}
+
+    for pin in pinata_data.get("rows", []):
+        name = pin.get("metadata", {}).get("name", "")
+        ipfs_hash = pin.get("ipfs_pin_hash")
+
+        if not name or not ipfs_hash:
+            continue
+
+        # Match image files: {COUNTRY_CODE}_{municipality}_{number}.png
+        # e.g., ITA_siena_064.png, DEU_munich_040.png
+        match = re.match(r"^([A-Z]{3})_([a-z]+)_(\d+)\.png$", name)
+        if match:
+            country_code = match.group(1)
+            municipality = match.group(2).lower()
+            flag_num = int(match.group(3))
+            image_map[(country_code, municipality, flag_num)] = ipfs_hash
+            continue
+
+        # Match metadata files: flag_{id}_metadata.json
+        match = re.match(r"^flag_(\d+)_metadata\.json$", name)
+        if match:
+            flag_id = int(match.group(1))
+            metadata_map[flag_id] = ipfs_hash
+
+    # Get all flags with their municipality and country info
+    flags = db.query(Flag).join(
+        Municipality, Flag.municipality_id == Municipality.id
+    ).join(
+        Region, Municipality.region_id == Region.id
+    ).join(
+        Country, Region.country_id == Country.id
+    ).all()
+
+    updated_count = 0
+
+    for flag in flags:
+        municipality = flag.municipality
+        region = municipality.region
+        country = region.country
+
+        country_code = country.code
+        municipality_name = municipality.name.lower()
+
+        # Find matching image by country_code + municipality + flag_id
+        image_hash = image_map.get((country_code, municipality_name, flag.id))
+        metadata_hash = metadata_map.get(flag.id)
+
+        updated = False
+        if image_hash and flag.image_ipfs_hash != image_hash:
+            flag.image_ipfs_hash = image_hash
+            updated = True
+        if metadata_hash and flag.metadata_ipfs_hash != metadata_hash:
+            flag.metadata_ipfs_hash = metadata_hash
+            updated = True
+
+        if updated:
+            updated_count += 1
+
+    db.commit()
+
+    return MessageResponse(
+        message=f"Synced IPFS hashes. Updated {updated_count} flags. "
+                f"Found {len(image_map)} images and {len(metadata_map)} metadata files in Pinata."
+    )
