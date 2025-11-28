@@ -66,6 +66,7 @@ def get_flags(
             name=flag.name,
             location_type=flag.location_type,
             category=flag.category,
+            nfts_required=flag.nfts_required,  # Multi-NFT field
             image_ipfs_hash=flag.image_ipfs_hash,
             metadata_ipfs_hash=flag.metadata_ipfs_hash,
             token_id=flag.token_id,
@@ -199,6 +200,7 @@ def create_flag(
         name=db_flag.name,
         location_type=db_flag.location_type,
         category=db_flag.category,
+        nfts_required=db_flag.nfts_required,  # Multi-NFT field
         image_ipfs_hash=db_flag.image_ipfs_hash,
         metadata_ipfs_hash=db_flag.metadata_ipfs_hash,
         token_id=db_flag.token_id,
@@ -248,6 +250,7 @@ def update_flag(
         name=db_flag.name,
         location_type=db_flag.location_type,
         category=db_flag.category,
+        nfts_required=db_flag.nfts_required,  # Multi-NFT field
         image_ipfs_hash=db_flag.image_ipfs_hash,
         metadata_ipfs_hash=db_flag.metadata_ipfs_hash,
         token_id=db_flag.token_id,

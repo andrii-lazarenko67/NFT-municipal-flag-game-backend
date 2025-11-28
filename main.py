@@ -29,11 +29,17 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configure CORS
+# Configure CORS - Allow all origins for Railway deployment
+# In production, Railway uses dynamic subdomains that need flexible CORS
+cors_origins = settings.cors_origins_list
+
+# Check if we should allow all origins (when wildcard pattern is present)
+allow_all_origins = any("*" in origin for origin in cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=["*"] if allow_all_origins else cors_origins,
+    allow_credentials=not allow_all_origins,  # Cannot use credentials with "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )

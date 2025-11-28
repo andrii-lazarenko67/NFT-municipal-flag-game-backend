@@ -42,7 +42,8 @@ class Settings(BaseSettings):
     admin_api_key: str = "change-this-key"
 
     # CORS - includes Railway frontend domain for production
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://nft-municipal-flag-game-frontend-production.up.railway.app"
+    # Allow all Railway subdomains and localhost for development
+    cors_origins: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://nft-municipal-flag-game-frontend-production.up.railway.app,https://*.up.railway.app"
 
     # Blockchain
     contract_address: str = ""

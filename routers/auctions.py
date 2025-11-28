@@ -37,6 +37,7 @@ def build_flag_response(flag: Flag) -> FlagResponse:
         name=flag.name,
         location_type=flag.location_type,
         category=flag.category,
+        nfts_required=flag.nfts_required,  # Multi-NFT field
         image_ipfs_hash=flag.image_ipfs_hash,
         metadata_ipfs_hash=flag.metadata_ipfs_hash,
         token_id=flag.token_id,
