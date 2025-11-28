@@ -189,6 +189,13 @@ async def sync_ipfs_from_pinata(
             image_map[flag_id] = ipfs_hash
             continue
 
+        # Also match: flag_{id}.png format
+        match = re.match(r"^flag_(\d+)\.png$", name)
+        if match:
+            flag_id = int(match.group(1))
+            image_map[flag_id] = ipfs_hash
+            continue
+
         # Match metadata files: flag_{id}_metadata.json
         match = re.match(r"^flag_(\d+)_metadata\.json$", name)
         if match:
