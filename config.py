@@ -1,6 +1,6 @@
 """
 Centralized configuration loader for the backend.
-Reads all settings from the root .env file.
+Reads settings from environment variables or .env file.
 """
 import os
 from pathlib import Path
@@ -9,9 +9,17 @@ from pydantic_settings import BaseSettings
 from typing import List
 
 
-# Find the root .env file (one level up from backend)
-ROOT_DIR = Path(__file__).parent.parent
-ENV_FILE = ROOT_DIR / ".env"
+# Find the .env file - check backend dir first, then parent (for local dev)
+BACKEND_DIR = Path(__file__).parent
+ROOT_DIR = BACKEND_DIR.parent
+
+# Priority: backend/.env > root/.env > environment variables
+if (BACKEND_DIR / ".env").exists():
+    ENV_FILE = BACKEND_DIR / ".env"
+elif (ROOT_DIR / ".env").exists():
+    ENV_FILE = ROOT_DIR / ".env"
+else:
+    ENV_FILE = None  # Will rely on environment variables (Railway)
 
 
 class Settings(BaseSettings):
@@ -33,8 +41,8 @@ class Settings(BaseSettings):
     # Admin
     admin_api_key: str = "change-this-key"
 
-    # CORS
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # CORS - includes Railway frontend domain for production
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://nft-municipal-flag-game-frontend-production.up.railway.app"
 
     # Blockchain
     contract_address: str = ""
@@ -76,7 +84,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",")]
 
     class Config:
-        env_file = str(ENV_FILE)
+        env_file = str(ENV_FILE) if ENV_FILE else None
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"  # Allow extra env vars not defined in Settings
