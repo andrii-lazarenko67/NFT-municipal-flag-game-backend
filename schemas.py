@@ -131,11 +131,19 @@ class MunicipalityDetailResponse(MunicipalityResponse):
 # =============================================================================
 
 class FlagCreate(BaseModel):
-    """Schema for creating a flag."""
+    """
+    Schema for creating a flag.
+
+    MULTI-NFT FEATURE:
+    nfts_required determines how many NFTs are needed to obtain this flag:
+    - 1: Standard single NFT flag (default)
+    - 3: Grouped NFT flag requiring 3 NFTs
+    """
     municipality_id: int
     name: str = Field(..., min_length=1, max_length=100)
     location_type: str = Field(..., min_length=1, max_length=50)
     category: FlagCategory = FlagCategory.STANDARD
+    nfts_required: int = Field(default=1, ge=1, le=10, description="Number of NFTs required to obtain this flag (1 or 3)")
     image_ipfs_hash: Optional[str] = None
     metadata_ipfs_hash: Optional[str] = None
     price: Decimal = Decimal("0.01")
@@ -146,22 +154,30 @@ class FlagUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     location_type: Optional[str] = Field(None, min_length=1, max_length=50)
     category: Optional[FlagCategory] = None
+    nfts_required: Optional[int] = Field(None, ge=1, le=10, description="Number of NFTs required to obtain this flag")
     image_ipfs_hash: Optional[str] = None
     metadata_ipfs_hash: Optional[str] = None
     price: Optional[Decimal] = None
 
 
 class FlagResponse(BaseSchema):
-    """Schema for flag response."""
+    """
+    Schema for flag response.
+
+    MULTI-NFT FEATURE:
+    nfts_required indicates how many NFTs are needed to obtain this flag.
+    total_price is calculated as price * nfts_required.
+    """
     id: int
     municipality_id: int
     name: str
     location_type: str
     category: FlagCategory
+    nfts_required: int = 1  # Number of NFTs required (1 = single, 3 = grouped)
     image_ipfs_hash: Optional[str]
     metadata_ipfs_hash: Optional[str]
     token_id: Optional[int]
-    price: Decimal
+    price: Decimal  # Price per NFT
     first_nft_status: NFTStatus
     second_nft_status: NFTStatus
     is_pair_complete: bool

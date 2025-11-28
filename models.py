@@ -114,7 +114,18 @@ class Municipality(Base):
 # =============================================================================
 
 class Flag(Base):
-    """Flag NFT model - represents a municipal flag with pair logic."""
+    """
+    Flag NFT model - represents a municipal flag with pair logic.
+
+    MULTI-NFT FEATURE:
+    Some flags require multiple NFTs to obtain (grouped NFTs).
+    - nfts_required=1: Standard single NFT flag
+    - nfts_required=3: Requires 3 NFTs to obtain the flag (grouped)
+
+    When nfts_required > 1, the user must mint/purchase that many NFTs
+    to complete the flag acquisition. This creates scarcity and higher
+    value for certain flags.
+    """
     __tablename__ = "flags"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -127,13 +138,18 @@ class Flag(Base):
     # Category determines discounts
     category = Column(Enum(FlagCategory), default=FlagCategory.STANDARD)
 
+    # MULTI-NFT REQUIREMENT:
+    # Number of NFTs required to obtain this flag (1 = single NFT, 3 = grouped NFTs)
+    # This implements the "1 NFT → 1 flag" vs "3 NFTs → 1 flag" requirement
+    nfts_required = Column(Integer, default=1, nullable=False)
+
     # IPFS storage
     image_ipfs_hash = Column(String(100), nullable=True)
     metadata_ipfs_hash = Column(String(100), nullable=True)
 
     # Blockchain data
     token_id = Column(Integer, nullable=True)  # Assigned after minting
-    price = Column(Numeric(18, 8), default=0.01)  # Price in MATIC
+    price = Column(Numeric(18, 8), default=0.01)  # Price in MATIC (per NFT)
 
     # Pair status
     first_nft_status = Column(Enum(NFTStatus), default=NFTStatus.AVAILABLE)

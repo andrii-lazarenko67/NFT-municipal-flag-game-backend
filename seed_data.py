@@ -1,5 +1,22 @@
 """
 Seed database with demo data.
+
+MULTI-NFT FEATURE DOCUMENTATION:
+================================
+This seed file implements the multi-NFT requirement feature where:
+- Most flags require 1 NFT to obtain (standard behavior)
+- Premium flags require 3 NFTs to obtain (grouped NFTs)
+
+Design Decision: We use "nfts_required" field to determine how many NFTs
+a user must mint/purchase to acquire a flag. This creates a tiered value
+system where more prestigious locations (Town Halls = Premium) require
+more effort to collect.
+
+Implementation:
+- nfts_required=1: User mints/purchases 1 NFT pair to get the flag
+- nfts_required=3: User mints/purchases 3 NFT pairs to get the flag
+
+The total cost is calculated as: price * nfts_required
 """
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -7,7 +24,27 @@ from models import Country, Region, Municipality, Flag, FlagCategory
 from config import settings
 
 
+def get_nfts_required_for_category(category: FlagCategory) -> int:
+    """
+    Determine how many NFTs are required based on flag category.
+
+    MULTI-NFT GROUPING LOGIC:
+    - PREMIUM flags: Require 3 NFTs (grouped) - most valuable, hardest to obtain
+    - PLUS flags: Require 1 NFT - medium value
+    - STANDARD flags: Require 1 NFT - basic flags
+
+    This creates a hierarchy where Premium locations like Town Halls
+    require more investment to collect.
+    """
+    if category == FlagCategory.PREMIUM:
+        return 3  # Premium flags require 3 NFTs (grouped)
+    return 1  # Standard and Plus flags require 1 NFT
+
+
 # Demo data configuration
+# MULTI-NFT FEATURE:
+# - Premium (Town Hall) flags require 3 NFTs to obtain (grouped)
+# - All other flags require 1 NFT (standard behavior)
 DEMO_DATA = {
     "countries": [
         {
@@ -190,10 +227,20 @@ def get_price_for_category(category: FlagCategory) -> Decimal:
 
 
 def seed_database(db: Session):
-    """Seed the database with demo data."""
+    """
+    Seed the database with demo data.
+
+    MULTI-NFT FEATURE:
+    Each flag is assigned an 'nfts_required' value based on its category:
+    - Premium flags: 3 NFTs required (grouped NFT acquisition)
+    - Plus/Standard flags: 1 NFT required (single NFT acquisition)
+    """
     print("🌱 Seeding database with demo data...")
+    print("📦 Multi-NFT Feature: Premium flags will require 3 NFTs")
 
     flag_counter = 0
+    premium_count = 0
+    standard_count = 0
 
     for country_data in DEMO_DATA["countries"]:
         # Create country
@@ -236,11 +283,20 @@ def seed_database(db: Session):
                     flag_lat = municipality_data["latitude"] + lat_offset
                     flag_lon = municipality_data["longitude"] + lon_offset
 
+                    # MULTI-NFT: Determine NFTs required based on category
+                    nfts_required = get_nfts_required_for_category(flag_data["category"])
+
+                    if nfts_required > 1:
+                        premium_count += 1
+                    else:
+                        standard_count += 1
+
                     flag = Flag(
                         municipality_id=municipality.id,
                         name=f"{flag_lat:.6f}, {flag_lon:.6f}",
                         location_type=flag_data["location_type"],
                         category=flag_data["category"],
+                        nfts_required=nfts_required,  # MULTI-NFT field
                         price=get_price_for_category(flag_data["category"])
                     )
                     db.add(flag)
@@ -248,7 +304,10 @@ def seed_database(db: Session):
                 print(f"        ✅ Created 8 flags for {municipality.name}")
 
     db.commit()
-    print(f"\n🎉 Seeding complete! Created {flag_counter} flags total.")
+    print(f"\n🎉 Seeding complete!")
+    print(f"   📊 Total flags: {flag_counter}")
+    print(f"   🔷 Single NFT flags (1 NFT): {standard_count}")
+    print(f"   🔶 Grouped NFT flags (3 NFTs): {premium_count}")
 
 
 def run_seed():
