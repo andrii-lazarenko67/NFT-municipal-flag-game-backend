@@ -171,7 +171,9 @@ async def sync_ipfs_from_pinata(
         pinata_data = response.json()
 
     # Build mapping of flag_id -> ipfs_hash for images and metadata
+    # Priority: {COUNTRY}_{city}_{id}.png > flag_{id}.png
     image_map = {}  # {flag_id: ipfs_hash}
+    image_map_fallback = {}  # {flag_id: ipfs_hash} for flag_{id}.png pattern
     metadata_map = {}  # {flag_id: ipfs_hash}
 
     for pin in pinata_data.get("rows", []):
@@ -181,19 +183,19 @@ async def sync_ipfs_from_pinata(
         if not name or not ipfs_hash:
             continue
 
-        # Match image files: {COUNTRY_CODE}_{municipality}_{flag_id}.png
-        # e.g., ITA_siena_064.png - the number is the flag ID
+        # Match PRIMARY image files: {COUNTRY_CODE}_{municipality}_{flag_id}.png
+        # e.g., ITA_siena_064.png, ESP_barcelona_001.png - the number is the flag ID
         match = re.match(r"^[A-Z]{3}_[a-z]+_(\d+)\.png$", name)
         if match:
             flag_id = int(match.group(1))
             image_map[flag_id] = ipfs_hash
             continue
 
-        # Also match: flag_{id}.png format
+        # Match FALLBACK: flag_{id}.png format (lower priority)
         match = re.match(r"^flag_(\d+)\.png$", name)
         if match:
             flag_id = int(match.group(1))
-            image_map[flag_id] = ipfs_hash
+            image_map_fallback[flag_id] = ipfs_hash
             continue
 
         # Match metadata files: flag_{id}_metadata.json
@@ -201,6 +203,11 @@ async def sync_ipfs_from_pinata(
         if match:
             flag_id = int(match.group(1))
             metadata_map[flag_id] = ipfs_hash
+
+    # Merge fallback into main map (only if not already present)
+    for flag_id, ipfs_hash in image_map_fallback.items():
+        if flag_id not in image_map:
+            image_map[flag_id] = ipfs_hash
 
     # Get all flags
     flags = db.query(Flag).all()
