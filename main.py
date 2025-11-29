@@ -54,6 +54,25 @@ async def startup_event():
     """Initialize database on startup and seed if empty."""
     init_db()
 
+    # Run database migrations for new columns
+    from database import engine
+    from sqlalchemy import text, inspect
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+
+        # Check if 'flags' table exists and if 'nfts_required' column exists
+        if 'flags' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('flags')]
+            if 'nfts_required' not in columns:
+                print("📦 Adding 'nfts_required' column to flags table...")
+                try:
+                    conn.execute(text("ALTER TABLE flags ADD COLUMN nfts_required INTEGER DEFAULT 1 NOT NULL"))
+                    conn.commit()
+                    print("✅ Column 'nfts_required' added successfully!")
+                except Exception as e:
+                    print(f"⚠️ Could not add column (may already exist): {e}")
+
     # Auto-seed database if empty (for Railway deployment)
     from database import SessionLocal
     from models import Country
